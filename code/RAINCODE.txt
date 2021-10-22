@@ -1,0 +1,157 @@
+#library "RAINCODE"
+#include "zcommon.acs"
+#include "C:\zdaemon\zdaemon.acs"
+
+#define NONE 0
+#define SEC  35
+
+// SpawnID as defined in DeHackEd.
+#define T_RAINDROP			13
+
+#define RAINTIDBASE 		5000
+#define RAINTIDOFFSET		30
+#define AMBIENTTID			5100
+
+// The AmbientSound number as defined in SNDINFO.
+#define AMBIENTSOUNDNUMBER	1	
+
+// Set this to 1 from anywhere to make it rain (or use the Cvar).
+global int 1:spawnRain;
+
+////////////////////////////////////////
+/*
+			=== PLAYER HANDLING ===
+*/
+////////////////////////////////////////
+
+script "rainspawner_enter" enter
+{	
+	int player = PlayerNumber();
+	
+	Delay(2);
+	ACS_NamedExecuteAlways("rainchecker", NONE);
+	
+	// Only bother starting the script if there's an ambient sound.
+	if (ThingCount(0, AMBIENTTID))
+	{
+		Thing_Deactivate(AMBIENTTID);
+		Client_NamedExecute(PlayerNumber(), "rainambience", 0, 0, 0, 0);
+	}
+	else
+	{
+		Log(s:"For the rain sound to work you must place an AmbientSound with tag (", d:AMBIENTTID, s:")!");
+	}
+	
+}
+
+script "rainspawner_respawn" respawn
+{	
+	Delay(2);
+	ACS_NamedExecuteAlways("rainspawner_enter", NONE);
+
+}
+
+////////////////////////////////////////
+/*
+			=== RAIN SPAWNER ===
+*/
+////////////////////////////////////////
+
+/*
+	This script waits for a statement to be set
+	In order to trigger the spawning of rain.
+	It also checks for other Cvars like the
+	Draw distance.
+*/
+
+script "rainchecker" (void)
+{
+	int player = PlayerNumber();
+	int rainInterval = 5;
+	int rainFallSpeed = 96;
+	int rainDrawDistance = 1000;
+	
+	Delay(2);
+	
+	while (PlayerInGame(player))
+    { 
+		// Main check whether we're going to spawn rain or not.
+		if (spawnRain
+			|| GetCvar("sv_alwaysrain"))
+		{
+			Client_NamedExecute(PlayerNumber(), "rainspawner", 0, rainDrawDistance, rainFallSpeed, 0);		
+		}
+		
+		if (GetCvar("sv_raindrawdistance") > 0)
+			rainDrawDistance = GetCvar("sv_raindrawdistance");
+			
+		if (GetCvar("sv_raininterval") > 0)
+			rainInterval = GetCvar("sv_raininterval");
+			
+		if (GetCvar("sv_rainfallspeed") > 0)
+			rainFallSpeed = GetCvar("sv_rainfallspeed");
+		
+		if (rainInterval < 1) // Just incase, avoid a runaway.
+			rainInterval = 1;
+			
+		Delay(rainInterval);
+	}
+	
+}
+
+script "rainspawner" (int drawDistance, int rainFallSpeed)
+{
+	int x, y, z; 
+
+	for (int i = RAINTIDBASE; i < RAINTIDBASE + RAINTIDOFFSET; i++)
+	{
+		x = GetActorX(0) + (ZD_rand(-drawDistance, drawDistance) << 16);
+		y = GetActorY(0) + (ZD_rand(-drawDistance, drawDistance) << 16);
+		z = GetActorCeilingZ(0) - 16.0;
+		//print(f:x, s:" ", f:y, s:" ", f:z);
+		Spawn("MapSpot", x, y, z, i, 0);
+		
+		if (CheckActorCeilingTexture(i, "F_SKY1"))
+			Thing_Projectile(i, T_RAINDROP, 0, ZD_rand(0, 5), -rainFallSpeed);
+				
+		Thing_Remove(i);
+	}
+	
+}
+
+script "rainambience" (int Arg1)
+{
+	int player = PlayerNumber();
+
+	Thing_Deactivate(AMBIENTTID);	
+	Delay(2);
+	Setthingspecial(AMBIENTTID, 0, AMBIENTSOUNDNUMBER);
+	
+	while (GetActorProperty(0, APROP_Health) > 0)
+	{
+		if (CheckActorCeilingTexture(0, "F_SKY1")
+			&& (spawnRain
+			|| GetCvar("sv_alwaysrain")))
+		{
+			Thing_Activate(AMBIENTTID); // Not the cleanest way of doing it, but oh well.
+			SetActorPosition(AMBIENTTID, GetActorX(0), GetActorY(0), GetActorZ(0), 0);
+		}
+		else
+		{
+			Thing_Deactivate(AMBIENTTID);	
+		}
+		delay(2);
+	}
+	Thing_Deactivate(AMBIENTTID);	
+	
+}
+
+// Purely to disable the sound when players haven't joined.
+
+script "ambiencehandler" open
+{
+	if (ThingCount(0, AMBIENTTID))
+	{
+		Thing_Deactivate(AMBIENTTID);
+	}
+}

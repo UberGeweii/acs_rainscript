@@ -1,0 +1,7 @@
+sv_alwaysrain - enable rain (default: 0)
+sv_raindrawdistance - rain draw distance in map units (default: 1000)
+sv_raininterval - rain density, 1 is fastest (default: 5)
+sv_rainfallspeed - the raindrop speed, how fast rain falls (default: 96)
+
+Credits: UberGewei, Krawa & Medis.
+Downloaded from the ZDaemon Forums.
